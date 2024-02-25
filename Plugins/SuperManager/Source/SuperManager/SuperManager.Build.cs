@@ -30,6 +30,10 @@ public class SuperManager : ModuleRules
                 "EditorScriptingUtilities",
                 "UMG",
 				"Niagara",
+				"UnrealEd",
+                "AssetRegistry",
+				"AssetTools",
+                "ContentBrowser",
             }
 			);
 			

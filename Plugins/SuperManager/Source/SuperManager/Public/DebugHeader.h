@@ -23,7 +23,7 @@ static EAppReturnType::Type ShowMsgDialog(EAppMsgType::Type MsgType, const FStri
 	{
 		FText MsgTitle = FText::FromString(TEXT("Warning"));
 
-		return FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(Message), &MsgTitle);
+		return FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(Message), MsgTitle);
 	}
 	else
 	{

@@ -28,10 +28,30 @@ class SUPERMANAGER_API UQuickAssetAction : public UAssetActionUtility
 	GENERATED_BODY()
 
 public:
+	/// <summary>
+	/// Assetの複製
+	/// </summary>
+	/// <param name="NumOfDuplicates">複製数</param>
 	UFUNCTION(CallInEditor)
 	void DuplicarteAssets(int32 NumOfDuplicates);
+	
+	/// <summary>
+	/// 形式に合わせてAsset名の頭に付ける
+	/// </summary>
 	UFUNCTION(CallInEditor)
 	void AddPrefixes();
+	
+	/// <summary>
+	/// 未参照のAssetを削除
+	/// </summary>
+	UFUNCTION(CallInEditor)
+	void RemoveUnusedAssets();
+
+private:
+	/// <summary>
+	/// 参照状態の修正
+	/// </summary>
+	void FixUpRedirectors();
 	
 private:
 	TMap<UClass*, FString> PrefixMap =
