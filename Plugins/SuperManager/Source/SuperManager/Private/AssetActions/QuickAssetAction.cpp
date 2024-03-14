@@ -11,6 +11,8 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetToolsModule.h"
 
+using namespace DebugHeader;
+
 void UQuickAssetAction::DuplicarteAssets(int32 NumOfDuplicates)
 {
 	//入力値が1以上かの確認
@@ -107,6 +109,7 @@ void UQuickAssetAction::RemoveUnusedAssets()
 	//未参照のAssetを探し、未参照リストに追加
 	for (const FAssetData& SelectedAssetData : SelectedAssetsData)
 	{
+		//該当Assetが参照しているAssetを取得
 		TArray<FString> AssetReferencers = 
 			UEditorAssetLibrary::FindPackageReferencersForAsset(SelectedAssetData.GetObjectPathString());
 
@@ -142,7 +145,7 @@ void UQuickAssetAction::FixUpRedirectors()
 	FARFilter Filter;
 	Filter.bRecursivePaths = true;
 	Filter.PackagePaths.Emplace(TEXT("/Game"));
-	Filter.ClassPaths.Emplace(FName("/Script/Engine.ObjectRedirector"));
+	Filter.ClassPaths.Emplace(TEXT("/Script/Engine.ObjectRedirector"));
 
 	//検索条件に合致するAssetを取得
 	TArray<FAssetData> OutRedirectors;

@@ -4,38 +4,61 @@
 #include "Widgets/Notifications/SNotificationList.h"
 #include "Framework/Notifications/NotificationManager.h"
 
-static inline void Print(const FString& Message, const FColor& Color)
+namespace DebugHeader
 {
-	if (GEngine)
+	/// <summary>
+	/// 画面表示のデバッグメッセージ
+	/// </summary>
+	/// <param name="Message">メッセージ内容</param>
+	/// <param name="Color">メッセージの色</param>
+	static void Print(const FString& Message, const FColor& Color)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 8.f, Color, Message);
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 8.f, Color, Message);
+		}
 	}
-}
 
-static inline void PrintLog(const FString& Message)
-{
-	UE_LOG(LogTemp, Warning, TEXT("%s"), *Message);
-}
-
-static EAppReturnType::Type ShowMsgDialog(EAppMsgType::Type MsgType, const FString& Message, bool bShowMsgAsWarning = true)
-{
-	if (bShowMsgAsWarning)
+	/// <summary>
+	/// ワーニングログ出力
+	/// </summary>
+	/// <param name="Message">メッセージ内容</param>
+	static void PrintLog(const FString& Message)
 	{
-		FText MsgTitle = FText::FromString(TEXT("Warning"));
-
-		return FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(Message), MsgTitle);
+		UE_LOG(LogTemp, Warning, TEXT("%s"), *Message);
 	}
-	else
+
+	/// <summary>
+	/// メッセージダイアログの表示
+	/// </summary>
+	/// <param name="MsgType">ダイアログの種類</param>
+	/// <param name="Message">表示メッセージ内容</param>
+	/// <param name="bShowMsgAsWarning">Warningの表記の有無</param>
+	/// <returns>ダイアログ選択の結果</returns>
+	static EAppReturnType::Type ShowMsgDialog(EAppMsgType::Type MsgType, const FString& Message, bool bShowMsgAsWarning = true)
 	{
-		return FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(Message));
+		if (bShowMsgAsWarning)
+		{
+			FText MsgTitle = FText::FromString(TEXT("Warning"));
+
+			return FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(Message), MsgTitle);
+		}
+		else
+		{
+			return FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(Message));
+		}
 	}
-}
 
-static void ShowNotifyInfo(const FString& Message)
-{
-	FNotificationInfo NotifyInfo(FText::FromString(Message));
-	NotifyInfo.bUseLargeFont = true;
-	NotifyInfo.FadeOutDuration = 7.f;
+	/// <summary>
+	/// 時限イベント通知の表示
+	/// </summary>
+	/// <param name="Message">メッセージ内容</param>
+	static void ShowNotifyInfo(const FString& Message)
+	{
+		FNotificationInfo NotifyInfo(FText::FromString(Message));
+		NotifyInfo.bUseLargeFont = true;
+		NotifyInfo.FadeOutDuration = 7.f;
 
-	FSlateNotificationManager::Get().AddNotification(NotifyInfo);
+		FSlateNotificationManager::Get().AddNotification(NotifyInfo);
+	}
 }
