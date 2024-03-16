@@ -3,6 +3,7 @@
 #include "SuperManager.h"
 
 #include "SlateWidgets/AdvanceDeletionWidget.h"
+#include "CustomStyle/SuperManagerStyle.h"
 #include "DebugHeader.h"
 
 #include "ContentBrowserModule.h"
@@ -15,17 +16,16 @@
 
 void FSuperManagerModule::StartupModule()
 {
-	// This code will execute after your module is loaded into memory; the exact timing is specified in the .uplugin file per-module
-
+	FSuperManagerStyle::InitializeIcons();
 	InitCBMenuExtention();
 	RegisterAdvancedDeletionTab();
-
 }
 
 void FSuperManagerModule::ShutdownModule()
 {
-	// This function may be called during shutdown to clean up your module.  For modules that support dynamic reloading,
-	// we call this function before unloading the module.
+	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(FName("AdvanceDeletion"));
+
+	FSuperManagerStyle::Shutdown();
 }
 
 #pragma region ContentBrowserMenuExtention
@@ -79,14 +79,14 @@ void FSuperManagerModule::AddCBMenuEntry(FMenuBuilder& MenuBuilder)
 	MenuBuilder.AddMenuEntry(
 		FText::FromString(TEXT("Delete Unused Assets")),
 		FText::FromString(TEXT("Safely delete all unused assets under folder")),
-		FSlateIcon(),
+		FSlateIcon(FSuperManagerStyle::GetStyleSetName(), "ContentBrowser.DeleteUnusedAssets"),
 		FExecuteAction::CreateRaw(this, &FSuperManagerModule::OnDeleteUnusedAssetButtonClicked)
 	);
 
 	MenuBuilder.AddMenuEntry(
 		FText::FromString(TEXT("Delete Empty Folders")),
 		FText::FromString(TEXT("Safely delete all folders")),
-		FSlateIcon(),
+		FSlateIcon(FSuperManagerStyle::GetStyleSetName(), "ContentBrowser.DeleteEmptyFolders"),
 		FExecuteAction::CreateRaw(this, &FSuperManagerModule::OnDeleteEmptyFoldersButtonClicked)
 	);
 
@@ -100,7 +100,7 @@ void FSuperManagerModule::AddCBMenuEntry(FMenuBuilder& MenuBuilder)
 	MenuBuilder.AddMenuEntry(
 		FText::FromString(TEXT("Advence Deletion")),
 		FText::FromString(TEXT("List assets by specific condition in a tab for deleting")),
-		FSlateIcon(),
+		FSlateIcon(FSuperManagerStyle::GetStyleSetName(), "ContentBrowser.AdvanceDeletion"),
 		FExecuteAction::CreateRaw(this, &FSuperManagerModule::OnAdvanceDeletionButtonClicked)
 	);
 }
@@ -362,7 +362,8 @@ void FSuperManagerModule::RegisterAdvancedDeletionTab()
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(
 		FName("AdvanceDeletion"),
 		FOnSpawnTab::CreateRaw(this, &FSuperManagerModule::OnSpawnAdvanceDeletionTab))
-		.SetDisplayName(FText::FromString(TEXT("Advance Deletion")));
+		.SetDisplayName(FText::FromString(TEXT("Advance Deletion")))
+		.SetIcon(FSlateIcon(FSuperManagerStyle::GetStyleSetName(), "ContentBrowser.AdvanceDeletion"));
 }
 
 TSharedRef<SDockTab> FSuperManagerModule::OnSpawnAdvanceDeletionTab(const FSpawnTabArgs& SpawnTabArgs)
@@ -372,7 +373,9 @@ TSharedRef<SDockTab> FSuperManagerModule::OnSpawnAdvanceDeletionTab(const FSpawn
 		SNew(SDockTab).TabRole(ETabRole::NomadTab)
 		[
 			//SAdvanceDeletionTabの要素の初期値設定
-			SNew(SAdvanceDeletionTab).AssetsDataToStore(GetAllAssetDataUnderSelectedFolder())
+			SNew(SAdvanceDeletionTab)
+			.AssetsDataToStore(GetAllAssetDataUnderSelectedFolder())
+			.CurrentSelectedFolder(FolderPathsSelected[0])
 		];
 }
 
@@ -465,6 +468,15 @@ void FSuperManagerModule::ListSameNameAssetsForAssetList(
 			}
 		}
 	}
+}
+
+void FSuperManagerModule::SyncCBToClickedAssetForAssetList(const FString& AssetPathToSync)
+{
+	TArray<FString> AssetsPathToSync;
+	AssetsPathToSync.Add(AssetPathToSync);
+
+	//AssetBrowserを選択したAssetの位置に同期
+	UEditorAssetLibrary::SyncBrowserToObjects(AssetsPathToSync);
 }
 
 #pragma endregion

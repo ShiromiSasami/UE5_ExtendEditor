@@ -23,6 +23,7 @@ void SAdvanceDeletionTab::Construct(const FArguments& InArgs)
 
 	CheckBoxesArray.Empty();
 	AssetsDataToDeleteArray.Empty();
+	ComboBoxSourceItems.Empty();
 
 	ComboBoxSourceItems.Add(MakeShared<FString>(LIST_ALL));
 	ComboBoxSourceItems.Add(MakeShared<FString>(LIST_UNUSED));
@@ -48,14 +49,32 @@ void SAdvanceDeletionTab::Construct(const FArguments& InArgs)
 				.ColorAndOpacity(FColor::White)
 			]
 
-			//説明テキストスロットを追加
+			//サポートスロットの追加
 			+ SVerticalBox::Slot().AutoHeight()
 			[
+				//表示内容の変更ドロップを追加
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot()
 				.AutoWidth()
 				[
 					ConstractComboBox()
+				]
+
+				//説明テキストスロットを追加
+				+ SHorizontalBox::Slot()
+				.FillWidth(.6f)
+				[
+					ConstractComboHelpTexts(
+						TEXT("You can manipulate the displayed contents by dropping them.\nLeft-click on an asset in the list to move the asset browser to that position."),
+						ETextJustify::Center)
+				]
+
+				+ SHorizontalBox::Slot()
+				.FillWidth(.1f)
+				[
+					ConstractComboHelpTexts(
+						TEXT("Current Folder:\n" + InArgs._CurrentSelectedFolder),
+						ETextJustify::Right)
 				]
 			]
 
@@ -110,7 +129,8 @@ TSharedRef<SListView<TSharedPtr<FAssetData>>> SAdvanceDeletionTab::ConstructAsse
 		.ItemHeight(24.f)
 		.ListItemsSource(&DisplayedAssetsData)
 		//紐づけるデリゲートを設定
-		.OnGenerateRow(this, &SAdvanceDeletionTab::OnGenerateRowForList);
+		.OnGenerateRow(this, &SAdvanceDeletionTab::OnGenerateRowForList)
+		.OnMouseButtonClick(this, &SAdvanceDeletionTab::OnRowWidgetMouseClicked);
 
 	return ConstructedAssetListView.ToSharedRef();
 }
@@ -180,6 +200,18 @@ void SAdvanceDeletionTab::OnComboSelectionChanged(TSharedPtr<FString> SelectedOp
 	RefreshAssetListView();
 }
 
+TSharedRef<STextBlock> SAdvanceDeletionTab::ConstractComboHelpTexts(const FString& TextContent, ETextJustify::Type TextJustify)
+{
+	TSharedRef<STextBlock> ConstructedHelpText =
+		SNew(STextBlock)
+		.Text(FText::FromString(TextContent))
+		.Justification(TextJustify)
+		//自動折り返しを設定
+		.AutoWrapText(true);
+
+	return ConstructedHelpText;
+}
+
 #pragma endregion
 
 #pragma region RowWidgetForAssetListView
@@ -245,6 +277,15 @@ TSharedRef<ITableRow> SAdvanceDeletionTab::OnGenerateRowForList(
 		];
 
 	return ListViewRowWidget;
+}
+
+void SAdvanceDeletionTab::OnRowWidgetMouseClicked(TSharedPtr<FAssetData> ClickedData)
+{
+	//モジュールの読み込み
+	FSuperManagerModule& SuperManagerModule =
+		FModuleManager::LoadModuleChecked<FSuperManagerModule>(TEXT("SuperManager"));
+	//アセットブラウザの同期
+	SuperManagerModule.SyncCBToClickedAssetForAssetList(ClickedData->GetObjectPathString());
 }
 
 TSharedRef<SCheckBox> SAdvanceDeletionTab::ConstructCheckBox(const TSharedPtr<FAssetData>& AssetDataToDisplay)
@@ -317,6 +358,12 @@ FReply SAdvanceDeletionTab::OnDeleteButtonClicked(TSharedPtr<FAssetData> Clicked
 		{
 			StoredAssetsData.Remove(ClickedAssetData);
 		}
+
+		if (DisplayedAssetsData.Contains(ClickedAssetData))
+		{
+			DisplayedAssetsData.Remove(ClickedAssetData);
+		}
+
 		RefreshAssetListView();
 	}
 	//イベント処理完了

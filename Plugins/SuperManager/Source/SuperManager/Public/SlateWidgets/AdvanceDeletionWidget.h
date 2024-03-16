@@ -9,6 +9,7 @@ class SAdvanceDeletionTab : public SCompoundWidget
 	SLATE_BEGIN_ARGS(SAdvanceDeletionTab){}
 	//要素の設定
 	SLATE_ARGUMENT(TArray<TSharedPtr<FAssetData>>, AssetsDataToStore)
+	SLATE_ARGUMENT(FString, CurrentSelectedFolder)
 	SLATE_END_ARGS()
 
 public:
@@ -49,6 +50,14 @@ private:
 	/// <param name="InSelectInfo">選択状態</param>
 	void OnComboSelectionChanged(TSharedPtr<FString> SelectedOption, ESelectInfo::Type InSelectInfo);
 
+	/// <summary>
+	/// ComboのHelpTextを生成する関数
+	/// </summary>
+	/// <param name="TextContent">Text内容</param>
+	/// <param name="TextJustify">Textの状態</param>
+	/// <returns>HelpTextBlock</returns>
+	TSharedRef<STextBlock> ConstractComboHelpTexts(const FString& TextContent, ETextJustify::Type TextJustify);
+
 	//CombatBoxMemberValiables
 	TArray<TSharedPtr<FString>> ComboBoxSourceItems;
 	TSharedPtr<STextBlock> ComboDisplayTextBlock;
@@ -67,6 +76,12 @@ private:
 		TSharedPtr<FAssetData> AssetDataToDisplay,
 		const TSharedRef<STableViewBase>& OwnerTable
 	);
+
+	/// <summary>
+	/// マウスで選択した時のイベント関数
+	/// </summary>
+	/// <param name="ClickedData">選択したAsset</param>
+	void OnRowWidgetMouseClicked(TSharedPtr<FAssetData> ClickedData);
 
 	/// <summary>
 	/// AssetDataのチェックボックスを生成する関数

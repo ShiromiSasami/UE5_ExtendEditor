@@ -126,6 +126,12 @@ public:
 		const TArray<TSharedPtr<FAssetData>>& AssetsDataToFilter,
 		TArray<TSharedPtr<FAssetData>>& OutSameNameAssetsData);
 
+	/// <summary>
+	/// 選択したAssetパス位置にAssetBrowserを同期する
+	/// </summary>
+	/// <param name="AssetPathToSync">同期するAssetのPath</param>
+	void SyncCBToClickedAssetForAssetList(const FString& AssetPathToSync);
+
 #pragma endregion
 
 };
