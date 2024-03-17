@@ -53,16 +53,15 @@ void UQuickMaterialCreationWidget::CreateMaterialFromSelectedTextures()
 
 		switch (ChannelPackingType)
 		{
-			using enum E_ChannelPackingType;
-		case ECPT_NoChannelPacking:
+		case E_ChannelPackingType::ECPT_NoChannelPacking:
 			Default_CreateMaterialNodes(CreatedMaterial, SelectedTexture, PinsConnectedCounter);
 			break;
 
-		case ECPT_ORM:
+		case E_ChannelPackingType::ECPT_ORM:
 			ORM_CreateMaterialNodes(CreatedMaterial, SelectedTexture, PinsConnectedCounter);
 			break;
 
-		case ECPT_MAX:
+		case E_ChannelPackingType::ECPT_MAX:
 			break;
 
 		default:
@@ -413,12 +412,11 @@ bool UQuickMaterialCreationWidget::TryConnectORM(
 			TextureSampleNode->SamplerType = EMaterialSamplerType::SAMPLERTYPE_Masks;
 			CreateMaterial->GetExpressionCollection().AddExpression(TextureSampleNode);
 			//各ポートをそれぞれのノードに接続
-			using enum EMaterialProperty;
-			FExpressionInput* AmbientOcclusion = CreateMaterial->GetExpressionInputForProperty(MP_AmbientOcclusion);
+			FExpressionInput* AmbientOcclusion = CreateMaterial->GetExpressionInputForProperty(EMaterialProperty::MP_AmbientOcclusion);
 			AmbientOcclusion->Connect(1, TextureSampleNode);
-			FExpressionInput* Roughness = CreateMaterial->GetExpressionInputForProperty(MP_Roughness);
+			FExpressionInput* Roughness = CreateMaterial->GetExpressionInputForProperty(EMaterialProperty::MP_Roughness);
 			Roughness->Connect(2, TextureSampleNode);
-			FExpressionInput* Metallic = CreateMaterial->GetExpressionInputForProperty(MP_Metallic);
+			FExpressionInput* Metallic = CreateMaterial->GetExpressionInputForProperty(EMaterialProperty::MP_Metallic);
 			Metallic->Connect(3, TextureSampleNode);
 			CreateMaterial->PostEditChange();
 

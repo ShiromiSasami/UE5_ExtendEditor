@@ -90,17 +90,6 @@ private:
 	TArray<TSharedPtr<FAssetData>> GetAllAssetDataUnderSelectedFolder();
 #pragma endregion
 
-#pragma region LevelEditorMenuExtension
-private:
-	void InitLevelEditorExtension();
-
-	TSharedRef<FExtender> CustomLevelEditorMenuExtender(
-		const TSharedRef<FUICommandList> UICommandList,
-		const TArray<AActor*> SelectedActors);
-
-#pragma endregion
-
-
 public:
 
 #pragma region ProccessDataForAdvancedDeletionTab

@@ -11,7 +11,6 @@
 #include "ObjectTools.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetToolsModule.h"
-#include "LevelEditor.h"
 
 #define LOCTEXT_NAMESPACE "FSuperManagerModule"
 
@@ -20,7 +19,6 @@ void FSuperManagerModule::StartupModule()
 	FSuperManagerStyle::InitializeIcons();
 	InitCBMenuExtention();
 	RegisterAdvancedDeletionTab();
-	InitLevelEditorExtension();
 }
 
 void FSuperManagerModule::ShutdownModule()
@@ -42,6 +40,9 @@ void FSuperManagerModule::InitCBMenuExtention()
 		ContentBrowserModule.GetAllPathViewContextMenuExtenders();
 
 	//拡張機能パスの追加(デリゲートバインド)
+	/*FContentBrowserMenuExtender_SelectedPaths CustomCBMenuDelegate;
+	CustomCBMenuDelegate.BindRaw(this, &FSuperManagerModule::CustomCBMenuExtender);
+	ContentBrowserModuleMenuExtenders.Add(CustomCBMenuDelegate);*/
 	ContentBrowserModuleMenuExtenders.Add(
 		FContentBrowserMenuExtender_SelectedPaths::CreateRaw(this, &FSuperManagerModule::CustomCBMenuExtender)
 	);
@@ -396,36 +397,6 @@ TArray<TSharedPtr<FAssetData>> FSuperManagerModule::GetAllAssetDataUnderSelected
 	}
 
 	return AvaiableAssetsData;
-}
-
-#pragma endregion
-
-#pragma region LevelEditorMenuExtension
-
-void FSuperManagerModule::InitLevelEditorExtension()
-{
-	FLevelEditorModule& LevelEditorModule =
-		FModuleManager::LoadModuleChecked<FLevelEditorModule>(TEXT("LevelEditor"));
-
-	TArray<FLevelEditorModule::FLevelViewportMenuExtender_SelectedActors>& LevelViewportMenuExtenders =
-		LevelEditorModule.GetAllLevelViewportContextMenuExtenders();
-
-	LevelViewportMenuExtenders.Add(FLevelEditorModule::FLevelViewportMenuExtender_SelectedActors::
-		CreateRaw(this, &FSuperManagerModule::CustomLevelEditorMenuExtender));
-}
-
-TSharedRef<FExtender> FSuperManagerModule::CustomLevelEditorMenuExtender(
-	const TSharedRef<FUICommandList> UICommandList,
-	const TArray<AActor*> SelectedActors)
-{
-	TSharedRef<FExtender> MenuExtender = MakeShareable(new FExtender());
-
-	if (!SelectedActors.IsEmpty())
-	{
-
-	}
-
-	return MenuExtender;
 }
 
 #pragma endregion
