@@ -72,12 +72,12 @@ private:
 #pragma region CustomEditorTab
 private:
 	/// <summary>
-	/// タブの登録初期処理
+	/// 削除タブの登録初期処理
 	/// </summary>
-	void RegisterAdvancedDeletionTab();
+	void RegisterTab();
 
 	/// <summary>
-	/// タブの表示時の処理
+	/// 削除タブの表示時の処理
 	/// </summary>
 	/// <param name="Args"></param>
 	/// <returns>タブの参照ポインタ</returns>
@@ -88,23 +88,116 @@ private:
 	/// </summary>
 	/// <returns>アセットデータの配列</returns>
 	TArray<TSharedPtr<FAssetData>> GetAllAssetDataUnderSelectedFolder();
+
+	/// <summary>
+	/// ロック中のActor一覧タブの表示時の処理
+	/// </summary>
+	/// <param name="Args"></param>
+	/// <returns>タブの参照ポインタ</returns>
+	TSharedRef<SDockTab> OnSpawnLockedActorsListTab(const FSpawnTabArgs& SpawnTabArgs);
+
+	/// <summary>
+	/// レベル上に存在する全てのアクターの配列を取得
+	/// </summary>
+	/// <returns>アクターの配列</returns>
+	TArray<TWeakObjectPtr<AActor>> GetAllLevelActors();
 #pragma endregion
 
 #pragma region LevelEditorMenuExtension
 private:
+	/// <summary>
+	/// LevelEditorのメニュー拡張機能の初期化
+	/// </summary>
 	void InitLevelEditorExtension();
 
+	/// <summary>
+	/// LevelEditorのメニュー拡張機能の追加
+	/// </summary>
+	/// <param name="UICommandList">UIコマンドリスト</param>
+	/// <param name="SelectedActors">選択中のアクター</param>
+	/// <returns>拡張機能</returns>
 	TSharedRef<FExtender> CustomLevelEditorMenuExtender(
 		const TSharedRef<FUICommandList> UICommandList,
 		const TArray<AActor*> SelectedActors);
 
+	/// <summary>
+	/// LevelEditorのメニュー項目の追加
+	/// </summary>
+	/// <param name="MenuBuilder">項目追加クラス</param>
+	void AddLevelEditorMenuEntry(FMenuBuilder& MenuBuilder);
+
+	/// <summary>
+	/// LockActorSelection項目を選択時の処理
+	/// </summary>
+	void OnLockActorSelectionButtonClicked();
+
+	/// <summary>
+	/// UnlockActorSelection項目を選択時の処理
+	/// </summary>
+	void OnUnlockActorSelectionButtonClicked();
+
+	/// <summary>
+	/// LockedActorsList項目を選択時の処理
+	/// </summary>
+	void OnDisplayListOfLockedActorsButtonClicked();
+
 #pragma endregion
 
+#pragma region SelectionLock
+
+	/// <summary>
+	/// 選択イベントの初期化
+	/// </summary>
+	void InitCustomSelectionEvent();
+
+	/// <summary>
+	/// 選択時の処理内容
+	/// </summary>
+	void OnActorSelected(UObject* SelectedObject);
+
+	/// <summary>
+	/// アクターをロック状態にする
+	/// </summary>
+	void LockActorSelection(AActor* ActorToProcess);
+
+	/// <summary>
+	/// アクターをロック解除する
+	/// </summary>
+	void UnlockActorSelection(AActor* ActorToProcess);
+
+	/// <summary>
+	/// アクターがロック状態か確認
+	/// </summary>
+	bool CheckIsActorSelectionLocked(AActor* ActorToProcess);
+
+#pragma endregion
+
+#pragma region CustomEditorUICommands
+
+private:
+	/// <summary>
+	/// カスタムコマンドリストの初期化
+	/// </summary>
+	void InitCustomUICommands();
+
+	/// <summary>
+	/// Lockコマンドキーが押された時の処理
+	/// </summary>
+	void OnSelectionLockHotkeyPressed();
+
+	/// <summary>
+	/// Lockコマンドキーが押された時の処理
+	/// </summary>
+	void OnUnlockActorsSelectionHotkeyPressed();
+
+private:
+	TSharedPtr<class FUICommandList> CustomUICommands;
+
+#pragma endregion
+
+#pragma region ProccessDataForTab
 
 public:
-
-#pragma region ProccessDataForAdvancedDeletionTab
-
 	/// <summary>
 	/// AssetListから単体アセットを削除
 	/// </summary>
@@ -143,6 +236,29 @@ public:
 	/// <param name="AssetPathToSync">同期するAssetのPath</param>
 	void SyncCBToClickedAssetForAssetList(const FString& AssetPathToSync);
 
+	/// <summary>
+	/// 任意のアクター配列をロックしているアセットのみのリストに変換
+	/// </summary>
+	/// <param name="ActorToFilter">変換したいアセットリスト</param>
+	/// <param name="OutLockActorData">変換後アセットリスト</param>
+	void ListLockActorForActorList(
+		const TArray<TWeakObjectPtr<AActor>>& ActorToFilter,
+		TArray<TWeakObjectPtr<AActor>>& OutLockActorData);
+
+	/// <summary>
+	/// 任意のアクター配列をロックされてないアクターのみのリストに変換
+	/// </summary>
+	/// <param name="ActorToFilter">変換したいアセットリスト</param>
+	/// <param name="OutUnlockActorData">変換後アセットリスト</param>
+	void ListUnlockActorForActorList(
+		const TArray<TWeakObjectPtr<AActor>>& ActorToFilter,
+		TArray<TWeakObjectPtr<AActor>>& OutUnlockActorData);
+
 #pragma endregion
 
+private:
+	bool GetEditorActorSubSystem();
+
+private:
+	TWeakObjectPtr<class UEditorActorSubsystem> WeakEditorActorSubSystem;
 };

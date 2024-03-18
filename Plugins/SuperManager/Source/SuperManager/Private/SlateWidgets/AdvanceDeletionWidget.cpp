@@ -175,8 +175,6 @@ TSharedRef<SWidget> SAdvanceDeletionTab::OnGenerateComboContent(TSharedPtr<FStri
 
 void SAdvanceDeletionTab::OnComboSelectionChanged(TSharedPtr<FString> SelectedOption, ESelectInfo::Type InSelectInfo)
 {
-	DebugHeader::Print(*SelectedOption.Get(), FColor::Cyan);
-
 	ComboDisplayTextBlock->SetText(FText::FromString(*SelectedOption.Get()));
 
 	//ƒ‚ƒWƒ…[ƒ‹‚Ì“Ç‚İ‚İ

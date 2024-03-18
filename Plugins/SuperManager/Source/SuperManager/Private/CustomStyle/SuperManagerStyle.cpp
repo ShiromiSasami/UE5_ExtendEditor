@@ -49,6 +49,13 @@ TSharedRef<FSlateStyleSet> FSuperManagerStyle::CreateSlateStyleSet()
 	CustomStyleSet->Set(
 		"ContentBrowser.AdvanceDeletion",
 		new FSlateImageBrush(IconDirectory / "AdvanceDeletion.png", Icon16x16));
+	CustomStyleSet->Set(
+		"LevelEditor.LockSelection",
+		new FSlateImageBrush(IconDirectory / "SelectionLock.png", Icon16x16));
+	CustomStyleSet->Set(
+		"LevelEditor.UnlockSelection",
+		new FSlateImageBrush(IconDirectory / "SelectionUnlock.png", Icon16x16));
+
 
 	return CustomStyleSet;
 }

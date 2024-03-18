@@ -3,7 +3,9 @@
 #include "SuperManager.h"
 
 #include "SlateWidgets/AdvanceDeletionWidget.h"
+#include "SlateWidgets/LockedActorsListWidget.h"
 #include "CustomStyle/SuperManagerStyle.h"
+#include "CustomUICommands/SuperManagerUICommands.h"
 #include "DebugHeader.h"
 
 #include "ContentBrowserModule.h"
@@ -12,6 +14,8 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetToolsModule.h"
 #include "LevelEditor.h"
+#include "Engine/Selection.h"
+#include "Subsystems/EditorActorSubsystem.h"
 
 #define LOCTEXT_NAMESPACE "FSuperManagerModule"
 
@@ -19,15 +23,21 @@ void FSuperManagerModule::StartupModule()
 {
 	FSuperManagerStyle::InitializeIcons();
 	InitCBMenuExtention();
-	RegisterAdvancedDeletionTab();
+	RegisterTab();
+	FSuperManagerUICommands::Register();
+	InitCustomUICommands();
 	InitLevelEditorExtension();
+	InitCustomSelectionEvent();
 }
 
 void FSuperManagerModule::ShutdownModule()
 {
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(FName("AdvanceDeletion"));
+	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(FName("LockedActorList"));
 
 	FSuperManagerStyle::Shutdown();
+
+	FSuperManagerUICommands::Unregister();
 }
 
 #pragma region ContentBrowserMenuExtention
@@ -351,36 +361,54 @@ bool FSuperManagerModule::ContainsRestrictedPath(const FString& Path)
 
 #pragma region CustomEditorTab
 
-void FSuperManagerModule::RegisterAdvancedDeletionTab()
+void FSuperManagerModule::RegisterTab()
 {
-	//Advance Deletionタブの登録
-	
+	//タブの登録
 	//第一引数: タブの名前
 	//第二引数: タブの生成処理
 	//第三引数: タブの表示名
+	
+	//Advance Deletionタブの登録
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(
 		FName("AdvanceDeletion"),
 		FOnSpawnTab::CreateRaw(this, &FSuperManagerModule::OnSpawnAdvanceDeletionTab))
 		.SetDisplayName(FText::FromString(TEXT("Advance Deletion")))
 		.SetIcon(FSlateIcon(FSuperManagerStyle::GetStyleSetName(), "ContentBrowser.AdvanceDeletion"));
+
+	//Locked Actors Listタブの登録
+	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(
+		FName("LockedActorsList"),
+		FOnSpawnTab::CreateRaw(this, &FSuperManagerModule::OnSpawnLockedActorsListTab))
+		.SetDisplayName(FText::FromString(TEXT("Locked Actors List")));
 }
 
 TSharedRef<SDockTab> FSuperManagerModule::OnSpawnAdvanceDeletionTab(const FSpawnTabArgs& SpawnTabArgs)
 {
-	//Advance Deletionタブの生成
-	return 
-		SNew(SDockTab).TabRole(ETabRole::NomadTab)
-		[
-			//SAdvanceDeletionTabの要素の初期値設定
-			SNew(SAdvanceDeletionTab)
-			.AssetsDataToStore(GetAllAssetDataUnderSelectedFolder())
-			.CurrentSelectedFolder(FolderPathsSelected[0])
-		];
+	if (!FolderPathsSelected.IsEmpty())
+	{
+		//Advance Deletionタブの生成
+		return
+			SNew(SDockTab).TabRole(ETabRole::NomadTab)
+			[
+				//SAdvanceDeletionTabの要素の初期値設定
+				SNew(SAdvanceDeletionTab)
+					.AssetsDataToStore(GetAllAssetDataUnderSelectedFolder())
+					.CurrentSelectedFolder(FolderPathsSelected[0])
+			];
+	}
+	else
+	{
+		DebugHeader::ShowMsgDialog(EAppMsgType::Ok, TEXT("No folder selected"));
+		return SNew(SDockTab);
+	}
+	
 }
 
 TArray<TSharedPtr<FAssetData>> FSuperManagerModule::GetAllAssetDataUnderSelectedFolder()
 {
 	TArray<TSharedPtr<FAssetData>> AvaiableAssetsData;
+
+	if(FolderPathsSelected.IsEmpty()){ return AvaiableAssetsData; }
 
 	TArray<FString> AssetsPathNames = UEditorAssetLibrary::ListAssets(FolderPathsSelected[0]);
 	for (const FString& AssetPathName : AssetsPathNames)
@@ -398,6 +426,36 @@ TArray<TSharedPtr<FAssetData>> FSuperManagerModule::GetAllAssetDataUnderSelected
 	return AvaiableAssetsData;
 }
 
+TSharedRef<SDockTab> FSuperManagerModule::OnSpawnLockedActorsListTab(const FSpawnTabArgs& SpawnTabArgs)
+{
+	//Locked Actors Listタブの生成
+	return
+		SNew(SDockTab).TabRole(ETabRole::NomadTab)
+		[
+			//SLockedActorsListTabの要素の初期値設定
+			SNew(SLockedActorsListTab)
+				.AllActorsInLevel(GetAllLevelActors())
+		];
+}
+
+TArray<TWeakObjectPtr<AActor>> FSuperManagerModule::GetAllLevelActors()
+{
+	TArray<TWeakObjectPtr<AActor>> AllLevelActors;
+
+	if (!GetEditorActorSubSystem()) { return AllLevelActors; }
+
+	TArray<AActor*> AllActorsOnLevel = WeakEditorActorSubSystem->GetAllLevelActors();
+
+	for (AActor* ActorInLevel : AllActorsOnLevel)
+	{
+		if (!ActorInLevel) { continue; }
+		AllLevelActors.Add(ActorInLevel);
+	}
+
+	return AllLevelActors;
+}
+
+
 #pragma endregion
 
 #pragma region LevelEditorMenuExtension
@@ -406,6 +464,9 @@ void FSuperManagerModule::InitLevelEditorExtension()
 {
 	FLevelEditorModule& LevelEditorModule =
 		FModuleManager::LoadModuleChecked<FLevelEditorModule>(TEXT("LevelEditor"));
+
+	TSharedRef<FUICommandList> ExistingLevelCommands = LevelEditorModule.GetGlobalLevelEditorActions();
+	ExistingLevelCommands->Append(CustomUICommands.ToSharedRef());
 
 	TArray<FLevelEditorModule::FLevelViewportMenuExtender_SelectedActors>& LevelViewportMenuExtenders =
 		LevelEditorModule.GetAllLevelViewportContextMenuExtenders();
@@ -422,10 +483,188 @@ TSharedRef<FExtender> FSuperManagerModule::CustomLevelEditorMenuExtender(
 
 	if (!SelectedActors.IsEmpty())
 	{
-
+		MenuExtender->AddMenuExtension(
+			FName("ActorOptions"),
+			EExtensionHook::Before,
+			UICommandList,
+			FMenuExtensionDelegate::CreateRaw(this, &FSuperManagerModule::AddLevelEditorMenuEntry));
 	}
 
 	return MenuExtender;
+}
+
+void FSuperManagerModule::AddLevelEditorMenuEntry(FMenuBuilder& MenuBuilder)
+{
+	//Lockの項目追加
+	MenuBuilder.AddMenuEntry(
+		FText::FromString(TEXT("Lock Actor Selection")),
+		FText::FromString(TEXT("Prevent actor from being selected")),
+		FSlateIcon(FSuperManagerStyle::GetStyleSetName(), FName("LevelEditor.LockSelection")),
+		FExecuteAction::CreateRaw(this, &FSuperManagerModule::OnLockActorSelectionButtonClicked)
+	);
+	//Unlockの項目追加
+	MenuBuilder.AddMenuEntry(
+		FText::FromString(TEXT("Unlock all actor Selection")),
+		FText::FromString(TEXT("Remove the selection constraint on all actor")),
+		FSlateIcon(FSuperManagerStyle::GetStyleSetName(), FName("LevelEditor.UnlockSelection")),
+		FExecuteAction::CreateRaw(this, &FSuperManagerModule::OnUnlockActorSelectionButtonClicked)
+	);
+
+	//Lock中のActor一覧表示の項目追加
+	MenuBuilder.AddMenuEntry(
+		FText::FromString(TEXT("Display List of Locked Actors")),
+		FText::FromString(TEXT("Locked All Actors On Display")),
+		FSlateIcon(FSuperManagerStyle::GetStyleSetName(), FName("LevelEditor.DisplayListOfLockedActors")),
+		FExecuteAction::CreateRaw(this, &FSuperManagerModule::OnDisplayListOfLockedActorsButtonClicked)
+	);
+}
+
+void FSuperManagerModule::OnLockActorSelectionButtonClicked()
+{
+	if (!GetEditorActorSubSystem()) { return; }
+
+	TArray<AActor*> SelectedActors = WeakEditorActorSubSystem->GetSelectedLevelActors();
+
+	if (SelectedActors.IsEmpty())
+	{
+		DebugHeader::ShowNotifyInfo(TEXT("No actor selected"));
+		return;
+	}
+
+	FString CurrentLockedActorNames = TEXT("Locked selection for:");
+	for (AActor* SelectedActor : SelectedActors)
+	{
+		if(!SelectedActor){ continue; }
+
+		LockActorSelection(SelectedActor);
+
+		WeakEditorActorSubSystem->SetActorSelectionState(SelectedActor, false);
+		CurrentLockedActorNames.Append(TEXT("\n"));
+		CurrentLockedActorNames.Append(SelectedActor->GetActorLabel());
+	}
+
+	DebugHeader::ShowNotifyInfo(CurrentLockedActorNames);
+}
+
+void FSuperManagerModule::OnUnlockActorSelectionButtonClicked()
+{
+	if (!GetEditorActorSubSystem()) { return; }
+
+	TArray<AActor*> AllActorsInLevel = WeakEditorActorSubSystem->GetAllLevelActors();
+	TArray<AActor*> AllLockedActors;
+
+	for (AActor* ActorsInLevel : AllActorsInLevel)
+	{
+		if (!ActorsInLevel) { continue; }
+
+		if (CheckIsActorSelectionLocked(ActorsInLevel))
+		{
+			AllLockedActors.Add(ActorsInLevel);
+		}
+	}
+
+	if (AllLockedActors.IsEmpty())
+	{
+		DebugHeader::ShowNotifyInfo(TEXT("No actor locked actor currently"));
+	}
+
+	FString UnlockedActorNames = TEXT("Lifted selection constraint for:");
+	for (AActor* LockedActor : AllLockedActors)
+	{
+		UnlockActorSelection(LockedActor);
+
+		UnlockedActorNames.Append(TEXT("\n"));
+		UnlockedActorNames.Append(LockedActor->GetActorLabel());
+	}
+
+	DebugHeader::ShowNotifyInfo(UnlockedActorNames);
+}
+
+void FSuperManagerModule::OnDisplayListOfLockedActorsButtonClicked()
+{
+	FGlobalTabmanager::Get()->TryInvokeTab(FName("LockedActorsList"));
+}
+
+#pragma endregion
+
+#pragma region SelectionLock
+
+void FSuperManagerModule::InitCustomSelectionEvent()
+{
+	//選択されたアクターの取得
+	//※USelectionは選択されたアクターのリストを保持するクラス
+	USelection* UserSelection = GEditor->GetSelectedActors();
+
+	UserSelection->SelectObjectEvent.AddRaw(this, &FSuperManagerModule::OnActorSelected);
+}
+
+void FSuperManagerModule::OnActorSelected(UObject* SelectedObject)
+{
+	if(!GetEditorActorSubSystem()){ return; }
+
+	if (AActor* SelectActor = Cast<AActor>(SelectedObject))
+	{
+		if (CheckIsActorSelectionLocked(SelectActor))
+		{
+			WeakEditorActorSubSystem->SetActorSelectionState(SelectActor, false);
+		}
+	}
+}
+
+void FSuperManagerModule::LockActorSelection(AActor* ActorToProcess)
+{
+	if (!ActorToProcess) { return; }
+
+	if (!ActorToProcess->ActorHasTag(FName("Locked")))
+	{
+		ActorToProcess->Tags.Add(FName("Locked"));
+	}
+}
+
+void FSuperManagerModule::UnlockActorSelection(AActor* ActorToProcess)
+{
+	if (!ActorToProcess) { return; }
+
+	if (ActorToProcess->ActorHasTag(FName("Locked")))
+	{
+		ActorToProcess->Tags.Remove(FName("Locked"));
+	}
+}
+
+bool FSuperManagerModule::CheckIsActorSelectionLocked(AActor* ActorToProcess)
+{
+	if (!ActorToProcess) { return false; }
+
+	return ActorToProcess->ActorHasTag(FName("Locked"));
+}
+
+#pragma endregion
+
+#pragma region CustomEditorUICommands
+
+void FSuperManagerModule::InitCustomUICommands()
+{
+	CustomUICommands = MakeShareable(new FUICommandList());
+
+	CustomUICommands->MapAction(
+		FSuperManagerUICommands::Get().LockActorSelection,
+		FExecuteAction::CreateRaw(this, &FSuperManagerModule::OnSelectionLockHotkeyPressed)
+	);
+
+	CustomUICommands->MapAction(
+		FSuperManagerUICommands::Get().UnlockActorSelection,
+		FExecuteAction::CreateRaw(this, &FSuperManagerModule::OnUnlockActorsSelectionHotkeyPressed)
+	);
+}
+
+void FSuperManagerModule::OnSelectionLockHotkeyPressed()
+{
+	OnLockActorSelectionButtonClicked();
+}
+
+void FSuperManagerModule::OnUnlockActorsSelectionHotkeyPressed()
+{
+	OnUnlockActorSelectionButtonClicked();
 }
 
 #pragma endregion
@@ -508,7 +747,46 @@ void FSuperManagerModule::SyncCBToClickedAssetForAssetList(const FString& AssetP
 	UEditorAssetLibrary::SyncBrowserToObjects(AssetsPathToSync);
 }
 
+void FSuperManagerModule::ListLockActorForActorList(
+	const TArray<TWeakObjectPtr<AActor>>& ActorToFilter,
+	TArray<TWeakObjectPtr<AActor>>& OutLockActorData)
+{
+	OutLockActorData.Empty();
+
+	for (const TWeakObjectPtr<AActor>& ActorSharedPtr : ActorToFilter)
+	{
+		if (CheckIsActorSelectionLocked(ActorSharedPtr.Get()))
+		{
+			OutLockActorData.Add(ActorSharedPtr);
+		}
+	}
+}
+
 #pragma endregion
+
+void FSuperManagerModule::ListUnlockActorForActorList(
+	const TArray<TWeakObjectPtr<AActor>>& ActorToFilter,
+	TArray<TWeakObjectPtr<AActor>>& OutUnlockActorData)
+{
+	OutUnlockActorData.Empty();
+
+	for (const TWeakObjectPtr<AActor>& ActorSharedPtr : ActorToFilter)
+	{
+		if (!CheckIsActorSelectionLocked(ActorSharedPtr.Get()))
+		{
+			OutUnlockActorData.Add(ActorSharedPtr);
+		}
+	}
+}
+
+bool FSuperManagerModule::GetEditorActorSubSystem()
+{
+	if (!WeakEditorActorSubSystem.IsValid())
+	{
+		WeakEditorActorSubSystem = GEditor->GetEditorSubsystem<UEditorActorSubsystem>();
+	}
+	return WeakEditorActorSubSystem != nullptr;
+}
 
 #undef LOCTEXT_NAMESPACE
 	
