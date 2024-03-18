@@ -6,16 +6,19 @@
 #include "SlateWidgets/LockedActorsListWidget.h"
 #include "CustomStyle/SuperManagerStyle.h"
 #include "CustomUICommands/SuperManagerUICommands.h"
+#include "CustomOutlinerColumn/OutlinerSelectionColumn.h"
 #include "DebugHeader.h"
 
 #include "ContentBrowserModule.h"
-#include "EditorAssetLibrary.h"
-#include "ObjectTools.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetToolsModule.h"
+#include "SceneOutlinerModule.h"
+#include "EditorAssetLibrary.h"
+#include "ObjectTools.h"
 #include "LevelEditor.h"
 #include "Engine/Selection.h"
 #include "Subsystems/EditorActorSubsystem.h"
+
 
 #define LOCTEXT_NAMESPACE "FSuperManagerModule"
 
@@ -28,16 +31,59 @@ void FSuperManagerModule::StartupModule()
 	InitCustomUICommands();
 	InitLevelEditorExtension();
 	InitCustomSelectionEvent();
+	InitSceneOutlinerColumnExtension();
 }
 
 void FSuperManagerModule::ShutdownModule()
 {
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(FName("AdvanceDeletion"));
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(FName("LockedActorList"));
-
 	FSuperManagerStyle::Shutdown();
-
 	FSuperManagerUICommands::Unregister();
+	UnregisterSceneOutlinerColumnExtension();
+}
+
+
+bool FSuperManagerModule::CheckIsActorSelectionLocked(AActor* ActorToProcess)
+{
+	if (!ActorToProcess) { return false; }
+
+	return ActorToProcess->ActorHasTag(FName("Locked"));
+}
+
+void FSuperManagerModule::RefreshSceneOutliner()
+{
+	FLevelEditorModule& LevelEditorModule =
+		FModuleManager::LoadModuleChecked<FLevelEditorModule>(TEXT("LevelEditor"));
+
+	TSharedPtr<ISceneOutliner> SceneOutliner = LevelEditorModule.GetFirstLevelEditor()->GetMostRecentlyUsedSceneOutliner();
+
+	if (SceneOutliner.IsValid())
+	{
+		SceneOutliner->FullRefresh();
+	}
+}
+
+void FSuperManagerModule::ProcessLockingForOutliner(AActor* ActorToProcess, bool bShouldLocked)
+{
+	if(!GetEditorActorSubSystem()){ return; }
+	if (bShouldLocked)
+	{
+		LockActorSelection(ActorToProcess);
+		WeakEditorActorSubSystem->SetActorSelectionState(ActorToProcess, false);
+		DebugHeader::ShowNotifyInfo(TEXT("Locked selection for:\n") + ActorToProcess->GetActorLabel());
+	}
+	else
+	{
+		UnlockActorSelection(ActorToProcess);
+		DebugHeader::ShowNotifyInfo(TEXT("Remove selection lock for:\n") + ActorToProcess->GetActorLabel());
+	}
+
+	RefreshSceneOutliner();
+	if (LockedActorsListTab && LockedActorsListTab.IsValid())
+	{
+		LockedActorsListTab->RefreshActorListView();
+	}
 }
 
 #pragma region ContentBrowserMenuExtention
@@ -428,13 +474,14 @@ TArray<TSharedPtr<FAssetData>> FSuperManagerModule::GetAllAssetDataUnderSelected
 
 TSharedRef<SDockTab> FSuperManagerModule::OnSpawnLockedActorsListTab(const FSpawnTabArgs& SpawnTabArgs)
 {
+	//SLockedActorsListTabの要素の初期値設定
+	LockedActorsListTab = SNew(SLockedActorsListTab).AllActorsInLevel(GetAllLevelActors());
+
 	//Locked Actors Listタブの生成
 	return
 		SNew(SDockTab).TabRole(ETabRole::NomadTab)
 		[
-			//SLockedActorsListTabの要素の初期値設定
-			SNew(SLockedActorsListTab)
-				.AllActorsInLevel(GetAllLevelActors())
+			LockedActorsListTab.ToSharedRef()
 		];
 }
 
@@ -454,7 +501,6 @@ TArray<TWeakObjectPtr<AActor>> FSuperManagerModule::GetAllLevelActors()
 
 	return AllLevelActors;
 }
-
 
 #pragma endregion
 
@@ -543,6 +589,12 @@ void FSuperManagerModule::OnLockActorSelectionButtonClicked()
 		CurrentLockedActorNames.Append(SelectedActor->GetActorLabel());
 	}
 
+	RefreshSceneOutliner();
+	if (LockedActorsListTab && LockedActorsListTab.IsValid())
+	{
+		LockedActorsListTab->RefreshActorListView();
+	}
+
 	DebugHeader::ShowNotifyInfo(CurrentLockedActorNames);
 }
 
@@ -575,6 +627,12 @@ void FSuperManagerModule::OnUnlockActorSelectionButtonClicked()
 
 		UnlockedActorNames.Append(TEXT("\n"));
 		UnlockedActorNames.Append(LockedActor->GetActorLabel());
+	}
+
+	RefreshSceneOutliner();
+	if (LockedActorsListTab && LockedActorsListTab.IsValid())
+	{
+		LockedActorsListTab->RefreshActorListView();
 	}
 
 	DebugHeader::ShowNotifyInfo(UnlockedActorNames);
@@ -631,13 +689,6 @@ void FSuperManagerModule::UnlockActorSelection(AActor* ActorToProcess)
 	}
 }
 
-bool FSuperManagerModule::CheckIsActorSelectionLocked(AActor* ActorToProcess)
-{
-	if (!ActorToProcess) { return false; }
-
-	return ActorToProcess->ActorHasTag(FName("Locked"));
-}
-
 #pragma endregion
 
 #pragma region CustomEditorUICommands
@@ -669,7 +720,41 @@ void FSuperManagerModule::OnUnlockActorsSelectionHotkeyPressed()
 
 #pragma endregion
 
-#pragma region ProccessDataForAdvancedDeletionTab
+#pragma region SceneOutlinerExtension
+
+void FSuperManagerModule::InitSceneOutlinerColumnExtension()
+{
+	FSceneOutlinerModule& SceneOutlinerModule =
+		FModuleManager::LoadModuleChecked<FSceneOutlinerModule>(TEXT("SceneOutliner"));
+
+	//カラムの設定
+	FSceneOutlinerColumnInfo SelectionLockColumnInfo(
+		ESceneOutlinerColumnVisibility::Visible,
+		1,
+		FCreateSceneOutlinerColumn::CreateRaw(this, &FSuperManagerModule::OnCreateSelectionLockColumn)
+	);
+
+	//カラムの登録
+	SceneOutlinerModule.RegisterDefaultColumnType<FOutlinerSelectionLockColumn>(SelectionLockColumnInfo);
+}
+
+TSharedRef<ISceneOutlinerColumn> FSuperManagerModule::OnCreateSelectionLockColumn(ISceneOutliner& SceneOutliner)
+{
+	//カラムの生成
+	return MakeShareable(new FOutlinerSelectionLockColumn(SceneOutliner));
+}
+
+void FSuperManagerModule::UnregisterSceneOutlinerColumnExtension()
+{
+	FSceneOutlinerModule& SceneOutlinerModule =
+		FModuleManager::LoadModuleChecked<FSceneOutlinerModule>(TEXT("SceneOutliner"));
+
+	SceneOutlinerModule.UnRegisterColumnType<FOutlinerSelectionLockColumn>();
+}
+
+#pragma endregion
+
+#pragma region ProccessDataForTab
 
 bool FSuperManagerModule::DeleteSingleAssetForAssetList(const FAssetData& AssetDataToDelete)
 {
@@ -762,8 +847,6 @@ void FSuperManagerModule::ListLockActorForActorList(
 	}
 }
 
-#pragma endregion
-
 void FSuperManagerModule::ListUnlockActorForActorList(
 	const TArray<TWeakObjectPtr<AActor>>& ActorToFilter,
 	TArray<TWeakObjectPtr<AActor>>& OutUnlockActorData)
@@ -778,6 +861,8 @@ void FSuperManagerModule::ListUnlockActorForActorList(
 		}
 	}
 }
+
+#pragma endregion
 
 bool FSuperManagerModule::GetEditorActorSubSystem()
 {

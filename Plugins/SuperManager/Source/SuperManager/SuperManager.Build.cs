@@ -36,6 +36,8 @@ public class SuperManager : ModuleRules
                 "ContentBrowser",
                 "InputCore",
                 "Projects",
+                "SceneOutliner",
+                "LevelEditor"
             }
 			);
 			

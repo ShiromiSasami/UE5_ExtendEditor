@@ -15,17 +15,17 @@ public:
 	//Widget生成時のコンストラクタ
 	void Construct(const FArguments& InArgs);
 
+	/// <summary>
+	/// リストビューのリフレッシュ関数
+	/// </summary>
+	void RefreshActorListView();
+
 private:
 	/// <summary>
 	/// ロック中のアクターリストビューの生成関数
 	/// </summary>
 	/// <returns>生成したリストビュー</returns>
 	TSharedRef<SListView<TWeakObjectPtr<AActor>>> ConstructListView();
-
-	/// <summary>
-	/// リストビューのリフレッシュ関数
-	/// </summary>
-	void RefreshActorListView();
 
 #pragma region ComboBoxForListingCondition
 

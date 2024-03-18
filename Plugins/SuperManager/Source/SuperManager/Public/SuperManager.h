@@ -5,6 +5,11 @@
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
 
+class UEditorActorSubsystem;
+class ISceneOutlinerColumn;
+class ISceneOutliner;
+class SLockedActorsListTab;
+
 class FSuperManagerModule : public IModuleInterface
 {
 public:
@@ -12,6 +17,18 @@ public:
 	/** IModuleInterface implementation */
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
+
+	/// <summary>
+	/// アクターがロック状態か確認
+	/// </summary>
+	bool CheckIsActorSelectionLocked(AActor* ActorToProcess);
+
+	/// <summary>
+	/// アクターを任意のロック状態にする
+	/// </summary>
+	/// <param name="ActorToProcess">対象のActor</param>
+	/// <param name="bShouldLocked">指定のロック状態</param>
+	void ProcessLockingForOutliner(AActor* ActorToProcess, bool bShouldLocked);
 
 #pragma region ContentBrowserMenuExtention
 private:
@@ -165,11 +182,6 @@ private:
 	/// </summary>
 	void UnlockActorSelection(AActor* ActorToProcess);
 
-	/// <summary>
-	/// アクターがロック状態か確認
-	/// </summary>
-	bool CheckIsActorSelectionLocked(AActor* ActorToProcess);
-
 #pragma endregion
 
 #pragma region CustomEditorUICommands
@@ -192,6 +204,27 @@ private:
 
 private:
 	TSharedPtr<class FUICommandList> CustomUICommands;
+
+#pragma endregion
+
+#pragma region SceneOutlinerExtension
+
+	/// <summary>
+	/// シーンアウトライナーのカラム拡張機能の初期化
+	/// </summary>
+	void InitSceneOutlinerColumnExtension();
+
+	/// <summary>
+	/// ロックのカラムを選択した時の処理
+	/// </summary>
+	/// <param name="SceneOutliner">選択したアウトライナー</param>
+	/// <returns>選択したカラム</returns>
+	TSharedRef<ISceneOutlinerColumn> OnCreateSelectionLockColumn(ISceneOutliner& SceneOutliner);
+
+	/// <summary>
+	/// アウトライナカラムの登録解除
+	/// </summary>
+	void UnregisterSceneOutlinerColumnExtension();
 
 #pragma endregion
 
@@ -259,6 +292,12 @@ public:
 private:
 	bool GetEditorActorSubSystem();
 
+	/// <summary>
+	/// Outlinerのリフレッシュ
+	/// </summary>
+	void RefreshSceneOutliner();
+
 private:
-	TWeakObjectPtr<class UEditorActorSubsystem> WeakEditorActorSubSystem;
+	TWeakObjectPtr<UEditorActorSubsystem> WeakEditorActorSubSystem;
+	TSharedPtr<SLockedActorsListTab> LockedActorsListTab;
 };

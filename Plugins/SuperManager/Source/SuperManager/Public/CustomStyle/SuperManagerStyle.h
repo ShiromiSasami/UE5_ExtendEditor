@@ -12,12 +12,14 @@ public:
 
 	static FName GetStyleSetName() { return StyleSetName; }
 
+	static TSharedRef< FSlateStyleSet > GetCreateSlateStyleSet() { return CreatedSlateStyleSet.ToSharedRef(); }
 private:
 	/// <summary>
 	/// SlateStyleSetÇÃê∂ê¨ä÷êî
 	/// </summary>
 	/// <returns>SlateStyleSet</returns>
 	static TSharedRef< FSlateStyleSet > CreateSlateStyleSet();
+
 
 private:
 	static FName StyleSetName;

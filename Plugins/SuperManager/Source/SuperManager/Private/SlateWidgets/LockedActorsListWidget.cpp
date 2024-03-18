@@ -122,18 +122,6 @@ void SLockedActorsListTab::Construct(const FArguments& InArgs)
 		];
 }
 
-TSharedRef<SListView<TWeakObjectPtr<AActor>>> SLockedActorsListTab::ConstructListView()
-{
-	ConstructedActorListView =
-		SNew(SListView<TWeakObjectPtr<AActor>>)
-		.ItemHeight(24.f)
-		.ListItemsSource(&DisplayedActorsData)
-		//紐づけるデリゲートを設定
-		.OnGenerateRow(this, &SLockedActorsListTab::OnGenerateRowForList);
-
-	return ConstructedActorListView.ToSharedRef();
-}
-
 void SLockedActorsListTab::RefreshActorListView()
 {
 	CheckBoxesArray.Empty();
@@ -143,6 +131,17 @@ void SLockedActorsListTab::RefreshActorListView()
 	{
 		ConstructedActorListView->RebuildList();
 	}
+}
+
+TSharedRef<SListView<TWeakObjectPtr<AActor>>> SLockedActorsListTab::ConstructListView()
+{
+	ConstructedActorListView =
+		SNew(SListView<TWeakObjectPtr<AActor>>)
+		.ItemHeight(24.f)
+		.ListItemsSource(&DisplayedActorsData)
+		.OnGenerateRow(this, &SLockedActorsListTab::OnGenerateRowForList);
+
+	return ConstructedActorListView.ToSharedRef();
 }
 
 #pragma region ComboBoxForListingCondition
@@ -217,7 +216,7 @@ TSharedRef<ITableRow> SLockedActorsListTab::OnGenerateRowForList(
 	TWeakObjectPtr<AActor> ActorToDisplay,
 	const TSharedRef<STableViewBase>& OwnerTable)
 {
-	if (!ActorToDisplay.IsValid()) { return SNew(STableRow<TSharedPtr<FAssetData>>, OwnerTable); }
+	if (!ActorToDisplay.IsValid()) { return SNew(STableRow<TWeakObjectPtr<AActor>>, OwnerTable); }
 
 	const FString DisplayActorName = ActorToDisplay->GetActorLabel();
 
@@ -228,8 +227,8 @@ TSharedRef<ITableRow> SLockedActorsListTab::OnGenerateRowForList(
 
 	//リストビューのウィジェットを生成
 	//要素間の間隔5.fを設定
-	TSharedRef<STableRow<TSharedPtr<AActor>>> ListViewRowWidget =
-		SNew(STableRow<TSharedPtr<AActor>>, OwnerTable)
+	TSharedRef<STableRow<TWeakObjectPtr<AActor>>> ListViewRowWidget =
+		SNew(STableRow<TWeakObjectPtr<AActor>>, OwnerTable)
 		.Padding(FMargin(5.f))
 		[
 			SNew(SHorizontalBox)
@@ -253,7 +252,7 @@ TSharedRef<ITableRow> SLockedActorsListTab::OnGenerateRowForList(
 					ConstructTextForRowWidget(ActorToDisplay->GetClass()->GetName(), ClassNameFont)
 				]
 
-				//アセット名の追加
+				//アクター名の追加
 				//横左寄せ、縦全体
 				+SHorizontalBox::Slot()
 				.HAlign(HAlign_Left)
@@ -339,14 +338,16 @@ TSharedRef<SButton> SLockedActorsListTab::ConstructButtonForRowWidget(const TWea
 
 FReply SLockedActorsListTab::OnButtonClicked(TWeakObjectPtr<AActor> ClickedActor)
 {
-	if (ClickedActor->ActorHasTag(FName("Locked")))
+	FSuperManagerModule& SuperManagerModule =
+		FModuleManager::LoadModuleChecked<FSuperManagerModule>(TEXT("SuperManager"));
+
+	if (SuperManagerModule.CheckIsActorSelectionLocked(ClickedActor.Get()))
 	{
-		ClickedActor->Tags.Remove(FName("Locked"));
-		
+		SuperManagerModule.ProcessLockingForOutliner(ClickedActor.Get(), false);
 	}
 	else
 	{
-		ClickedActor->Tags.AddUnique(FName("Locked"));
+		SuperManagerModule.ProcessLockingForOutliner(ClickedActor.Get(), true);
 	}
 
 	if (ComboDisplayTextBlock->GetText().ToString() != LIST_ALL) 
@@ -356,8 +357,6 @@ FReply SLockedActorsListTab::OnButtonClicked(TWeakObjectPtr<AActor> ClickedActor
 			DisplayedActorsData.Remove(ClickedActor);
 		}
 	}
-
-	RefreshActorListView();
 
 	//イベント処理完了
 	return FReply::Handled();
@@ -394,19 +393,20 @@ FReply SLockedActorsListTab::OnLockAllButtonClicked()
 		ActorToToggleLock.Add(Actor);
 	}
 
+	FSuperManagerModule& SuperManagerModule =
+		FModuleManager::LoadModuleChecked<FSuperManagerModule>(TEXT("SuperManager"));
+
 	//ロックし、DisplayedActorListから削除
 	for (TWeakObjectPtr<AActor> Actor : ActorToToggleLock)
 	{
-		Actor->Tags.AddUnique(FName("Locked"));
+		SuperManagerModule.ProcessLockingForOutliner(Actor.Get(), true);
 
-		if (ComboDisplayTextBlock->GetText().ToString() != LIST_LOCK) { continue; }
+		if (ComboDisplayTextBlock->GetText().ToString() != LIST_UNLOCK) { continue; }
 		if (DisplayedActorsData.Contains(Actor))
 		{
 			DisplayedActorsData.Remove(Actor);
 		}
 	}
-
-	RefreshActorListView();
 
 	return FReply::Handled();
 }
@@ -438,19 +438,20 @@ FReply SLockedActorsListTab::OnUnlockAllButtonClicked()
 		ActorToToggleLock.Add(Actor);
 	}
 
+	FSuperManagerModule& SuperManagerModule =
+		FModuleManager::LoadModuleChecked<FSuperManagerModule>(TEXT("SuperManager"));
+
 	//ロック解除し、DisplayedActorListから削除
 	for (TWeakObjectPtr<AActor> Actor : ActorToToggleLock)
 	{
-		Actor->Tags.Remove(FName("Locked"));
+		SuperManagerModule.ProcessLockingForOutliner(Actor.Get(), false);
 
-		if (ComboDisplayTextBlock->GetText().ToString() != LIST_UNLOCK) { continue; }
+		if (ComboDisplayTextBlock->GetText().ToString() != LIST_LOCK) { continue; }
 		if (DisplayedActorsData.Contains(Actor))
 		{
 			DisplayedActorsData.Remove(Actor);
 		}
 	}
-
-	RefreshActorListView();
 
 	return FReply::Handled();
 }
