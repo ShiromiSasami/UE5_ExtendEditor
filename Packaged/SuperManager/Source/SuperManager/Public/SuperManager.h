@@ -107,6 +107,12 @@ private:
 	TArray<TSharedPtr<FAssetData>> GetAllAssetDataUnderSelectedFolder();
 
 	/// <summary>
+	/// 削除タブを閉じた時の処理
+	/// </summary>
+	/// <param name="TabToClose">閉じたタブ</param>
+	void OnAdvanceDeletionTabClosed(TSharedRef<SDockTab> TabToClose);
+
+	/// <summary>
 	/// ロック中のActor一覧タブの表示時の処理
 	/// </summary>
 	/// <param name="Args"></param>
@@ -118,6 +124,10 @@ private:
 	/// </summary>
 	/// <returns>アクターの配列</returns>
 	TArray<TWeakObjectPtr<AActor>> GetAllLevelActors();
+
+private:
+	TSharedPtr<SDockTab> ConstructedDockTab;
+
 #pragma endregion
 
 #pragma region LevelEditorMenuExtension
@@ -221,8 +231,12 @@ private:
 	/// <returns>選択したカラム</returns>
 	TSharedRef<ISceneOutlinerColumn> OnCreateSelectionLockColumn(ISceneOutliner& SceneOutliner);
 
-#pragma endregion
+	/// <summary>
+	/// アウトライナカラムの登録解除
+	/// </summary>
+	void UnregisterSceneOutlinerColumnExtension();
 
+#pragma endregion
 
 #pragma region ProccessDataForTab
 

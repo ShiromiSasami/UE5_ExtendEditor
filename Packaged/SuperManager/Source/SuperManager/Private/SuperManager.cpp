@@ -38,10 +38,9 @@ void FSuperManagerModule::ShutdownModule()
 {
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(FName("AdvanceDeletion"));
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(FName("LockedActorList"));
-
 	FSuperManagerStyle::Shutdown();
-
 	FSuperManagerUICommands::Unregister();
+	UnregisterSceneOutlinerColumnExtension();
 }
 
 
@@ -163,6 +162,12 @@ void FSuperManagerModule::AddCBMenuEntry(FMenuBuilder& MenuBuilder)
 
 void FSuperManagerModule::OnDeleteUnusedAssetButtonClicked()
 {
+	if (ConstructedDockTab.IsValid())
+	{
+		DebugHeader::ShowMsgDialog(EAppMsgType::Ok, TEXT("Please close advance deletion tab before this operation"));
+		return;
+	}
+
 	//選択したフォルダーパスの数が1より多い場合、エラーを表示
 	if (FolderPathsSelected.Num() > 1)
 	{
@@ -222,6 +227,12 @@ void FSuperManagerModule::OnDeleteUnusedAssetButtonClicked()
 
 void FSuperManagerModule::OnDeleteEmptyFoldersButtonClicked()
 {
+	if (ConstructedDockTab.IsValid())
+	{
+		DebugHeader::ShowMsgDialog(EAppMsgType::Ok, TEXT("Please close advance deletion tab before this operation"));
+		return;
+	}
+
 	//参照状態を修正
 	FixUpRedirectors();
 
@@ -431,24 +442,27 @@ void FSuperManagerModule::RegisterTab()
 
 TSharedRef<SDockTab> FSuperManagerModule::OnSpawnAdvanceDeletionTab(const FSpawnTabArgs& SpawnTabArgs)
 {
-	if (!FolderPathsSelected.IsEmpty())
-	{
-		//Advance Deletionタブの生成
-		return
-			SNew(SDockTab).TabRole(ETabRole::NomadTab)
-			[
-				//SAdvanceDeletionTabの要素の初期値設定
-				SNew(SAdvanceDeletionTab)
-					.AssetsDataToStore(GetAllAssetDataUnderSelectedFolder())
-					.CurrentSelectedFolder(FolderPathsSelected[0])
-			];
-	}
-	else
+	if(FolderPathsSelected.IsEmpty())
 	{
 		DebugHeader::ShowMsgDialog(EAppMsgType::Ok, TEXT("No folder selected"));
-		return SNew(SDockTab);
+		return SNew(SDockTab).TabRole(ETabRole::NomadTab);
 	}
-	
+
+	//Advance Deletionタブの生成
+	ConstructedDockTab =
+		SNew(SDockTab).TabRole(ETabRole::NomadTab)
+		[
+			//SAdvanceDeletionTabの要素の初期値設定
+			SNew(SAdvanceDeletionTab)
+				.AssetsDataToStore(GetAllAssetDataUnderSelectedFolder())
+				.CurrentSelectedFolder(FolderPathsSelected[0])
+		];
+
+	ConstructedDockTab->SetOnTabClosed(
+		SDockTab::FOnTabClosedCallback::CreateRaw(this, &FSuperManagerModule::OnAdvanceDeletionTabClosed)
+	);
+
+	return ConstructedDockTab.ToSharedRef();
 }
 
 TArray<TSharedPtr<FAssetData>> FSuperManagerModule::GetAllAssetDataUnderSelectedFolder()
@@ -471,6 +485,15 @@ TArray<TSharedPtr<FAssetData>> FSuperManagerModule::GetAllAssetDataUnderSelected
 	}
 
 	return AvaiableAssetsData;
+}
+
+void FSuperManagerModule::OnAdvanceDeletionTabClosed(TSharedRef<SDockTab> TabToClose)
+{
+	if (ConstructedDockTab.IsValid())
+	{
+		ConstructedDockTab.Reset();
+		FolderPathsSelected.Empty();
+	}
 }
 
 TSharedRef<SDockTab> FSuperManagerModule::OnSpawnLockedActorsListTab(const FSpawnTabArgs& SpawnTabArgs)
@@ -743,6 +766,14 @@ TSharedRef<ISceneOutlinerColumn> FSuperManagerModule::OnCreateSelectionLockColum
 {
 	//カラムの生成
 	return MakeShareable(new FOutlinerSelectionLockColumn(SceneOutliner));
+}
+
+void FSuperManagerModule::UnregisterSceneOutlinerColumnExtension()
+{
+	FSceneOutlinerModule& SceneOutlinerModule =
+		FModuleManager::LoadModuleChecked<FSceneOutlinerModule>(TEXT("SceneOutliner"));
+
+	SceneOutlinerModule.UnRegisterColumnType<FOutlinerSelectionLockColumn>();
 }
 
 #pragma endregion
